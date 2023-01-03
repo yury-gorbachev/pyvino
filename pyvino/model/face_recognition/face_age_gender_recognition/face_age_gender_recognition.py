@@ -18,18 +18,17 @@ class FaceAgeGenderRecognition(BasicModel):
     def _post_process(self, frame, cur_request_id=0):
         # Collecting object detection results
         result = {}
-        if self.exec_net.requests[cur_request_id].wait(-1) == 0:
-            detections = self.exec_net.requests[cur_request_id].outputs
-            
-            age = (detections['age_conv3'].flatten()[0]) * 100
-            gender_plobs = detections['prob'].flatten()
-            gender_id = int(np.argmax(gender_plobs))
-            gender = self.gender_label[gender_id]
-            gender_plob = gender_plobs[gender_id]
+        irequest=self.model_requests[cur_request_id]
+        irequest.wait()
 
-            result['age'] = round(age, 1)
-            result['gender'] = gender
-            result['gender_plob'] = gender_plob
-                    
+        age=(irequest.get_tensor('age_conv3').data.flatten()[0]) * 100
+        gender_plobs=irequest.get_tensor('prob').data.flatten()
+        gender_id = int(np.argmax(gender_plobs))
+        gender = self.gender_label[gender_id]
+        gender_plob = gender_plobs[gender_id]
+
+        result['age'] = round(age, 1)
+        result['gender'] = gender
+        result['gender_plob'] = gender_plob
+
         return result
-

@@ -18,27 +18,27 @@ class FacialLandmark(BasicModel):
     
     def _post_process(self, frame, cur_request_id=0):
         # Collecting object detection results
-        if self.exec_net.requests[cur_request_id].wait(-1) == 0:
-            detections = self.exec_net.requests[cur_request_id].outputs
-            
-            normed_landmarks = detections['align_fc3'].flatten()
+        irequest=self.model_requests[cur_request_id]
+        irequest.wait()
 
-            pos = []
-            for num, i in enumerate(range(int(normed_landmarks.size / 2))):
-                normed_x = normed_landmarks[2 * i]
-                normed_y = normed_landmarks[2 * i + 1]
-                x_lm = frame.shape[1] * normed_x
-                y_lm = frame.shape[0] * normed_y
+        normed_landmarks = irequest.get_tensor('align_fc3').data.flatten()
+
+        pos = []
+        for num, i in enumerate(range(int(normed_landmarks.size / 2))):
+            normed_x = normed_landmarks[2 * i]
+            normed_y = normed_landmarks[2 * i + 1]
+            x_lm = frame.shape[1] * normed_x
+            y_lm = frame.shape[0] * normed_y
                 
-                pos.append([int(x_lm), int(y_lm)])
+            pos.append([int(x_lm), int(y_lm)])
 
-                if self.args.draw:
-                    cv2.circle(frame, (int(x_lm), int(y_lm)), 1 + int(0.03 * frame.shape[1]), (255, 255, 0), -1)
+            if self.args.draw:
+                cv2.circle(frame, (int(x_lm), int(y_lm)), 1 + int(0.03 * frame.shape[1]), (255, 255, 0), -1)
             
-            result = {}
-            result['normed_landmarks'] = normed_landmarks
-            result['pos'] = pos
-            result['image'] = frame
+        result = {}
+        result['normed_landmarks'] = normed_landmarks
+        result['pos'] = pos
+        result['image'] = frame
 
         return result
 

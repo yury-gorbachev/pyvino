@@ -18,16 +18,16 @@ class EmotionRecognition(BasicModel):
     def _post_process(self, frame, cur_request_id=0):
         # Collecting object detection results
         result = {}
-        if self.exec_net.requests[cur_request_id].wait(-1) == 0:
-            detections = self.exec_net.requests[cur_request_id].outputs
+        irequest=self.model_requests[cur_request_id]
+        irequest.wait()
+
+        probs=irequest.get_tensor('prob_emotion').data.flatten()
+
+        emotion_id = np.argmax(probs)
+        emotion = self.label[emotion_id]
+        emotion_prob = probs[emotion_id]
             
-            probs = detections['prob_emotion'].flatten()
-            emotion_id = np.argmax(probs)
-            emotion = self.label[emotion_id]
-            emotion_prob = probs[emotion_id]
-            
-            result['emotion'] = emotion
-            result['emotion_prob'] = emotion_prob
+        result['emotion'] = emotion
+        result['emotion_prob'] = emotion_prob
         
         return result
-

@@ -22,24 +22,27 @@ class HedPoseEstimation(BasicModel):
     def _post_process(self, face_frame, cur_request_id=0):
         # Collecting object detection results
         result = {}
-        if self.exec_net.requests[cur_request_id].wait(-1) == 0:
-            infer_rets = self.exec_net.requests[cur_request_id].outputs
 
-            yaw, pitch, roll = self.get_axis(face_frame, infer_rets)
-            center_of_face = self.get_center_face(face_frame, 0, 0)
+        irequest=self.model_requests[cur_request_id]
+        irequest.wait()
 
-            result['yaw'] = yaw
-            result['pitch'] = pitch
-            result['roll'] = roll
-            result['center_of_face'] = center_of_face
-            
-            if self.args.draw:
-                scale = (face_frame.shape[0] ** 2 + face_frame.shape[1] ** 2) ** 0.5 / 2
-                self._draw_axes(face_frame, center_of_face, yaw,
-                                pitch, roll, scale, self.focal_length)
-                
-                result['image'] = face_frame
-        
+        yaw = irequest.get_tensor('angle_y_fc').data[0][0]
+        pitch = irequest.get_tensor('angle_p_fc').data[0][0]
+        roll = irequest.get_tensor('angle_r_fc').data[0][0]
+
+        center_of_face = self.get_center_face(face_frame, 0, 0)
+
+        result['yaw'] = yaw
+        result['pitch'] = pitch
+        result['roll'] = roll
+        result['center_of_face'] = center_of_face
+
+        if self.args.draw:
+            scale = (face_frame.shape[0] ** 2 + face_frame.shape[1] ** 2) ** 0.5 / 2
+            self._draw_axes(face_frame, center_of_face, yaw,
+                            pitch, roll, scale, self.focal_length)
+
+            result['image'] = face_frame
         return result
 
     def _build_camera_matrix(self, center_of_face, focal_length):
@@ -111,13 +114,6 @@ class HedPoseEstimation(BasicModel):
         cv2.circle(frame, p2, 3, (255, 0, 0), 2)
 
         return frame
-
-    def get_axis(self, face_frame, result):
-        # Each output contains one float value that represents value in Tait-Bryan angles (yaw, pitсh or roll).
-        yaw = result['angle_y_fc'][0][0]
-        pitch = result['angle_p_fc'][0][0]
-        roll = result['angle_r_fc'][0][0]
-        return yaw, pitch, roll
 
     def get_center_face(self, face_frame, xmin, ymin):
         center_of_face = (xmin + face_frame.shape[1] / 2, ymin + face_frame.shape[0] / 2, 0)

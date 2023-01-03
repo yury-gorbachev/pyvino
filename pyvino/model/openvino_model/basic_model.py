@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import openvino.runtime as ov
 
 from .openvino_model import OpenVinoModel
 from ...util.logger import get_logger
@@ -23,7 +24,7 @@ class BasicModel(OpenVinoModel):
         results = {}
         for request_id, frame in enumerate(frames):
             results[request_id] = {}
-            result = self._compute(frame, request_id)            
+            result = self._compute(frame, request_id)
             results[request_id] = result
         return results
 
@@ -38,17 +39,16 @@ class BasicModel(OpenVinoModel):
         in_frame = cv2.resize(frame, (self.w, self.h))
         in_frame = in_frame.transpose((2, 0, 1))  # Change data layout from HWC to CHW
         in_frame = in_frame.reshape((self.n, self.c, self.h, self.w))
+        in_frame = in_frame.astype(np.float32)
         return in_frame
     
     def _infer(self, frame, request_id=0):
-        self.exec_net.start_async(request_id=request_id, inputs={self.input_blob: frame})
+        self.model_requests[request_id].set_tensor(self.model_input, ov.Tensor(frame))
+        self.model_requests[request_id].start_async()
                     
     def _post_process(self, frame, cur_request_id=0):
         # Collecting object detection results
-        if self.exec_net.requests[cur_request_id].wait(-1) == 0:
-            infer_rets = self.exec_net.requests[cur_request_id].outputs
-            ########### Implement here ###########
-            infer_rets = infer_rets[self.output_blob][0]
-            ######################################
+        self.model_requests[cur_request_id].wait_for(-1)
+        infer_rets = self.exec_net.requests[cur_request_id].get_output_tensor(self.model_output).data[0]
         results = {'output': infer_rets}
         return results

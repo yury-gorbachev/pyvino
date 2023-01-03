@@ -16,13 +16,14 @@ class ObjectDetector(BasicModel):
     def _post_process(self, frame, cur_request_id=0):
         # Collecting object detection results
         result = {}
-        if self.exec_net.requests[cur_request_id].wait(-1) == 0:
-            detections = self.exec_net.requests[cur_request_id].outputs
-            # input is only one image here
-            detections = detections[self.output_blob][0][0]
-            output = self._decode_detections(detections, frame.shape)
-            result['output'] = output
+
+        irequest=self.model_requests[cur_request_id]
+        irequest.wait()
         
+        detections=irequest.get_output_tensor(0).data[0][0]
+        output=self._decode_detections(detections, frame.shape)
+        result['output']=output
+
         if self.args.draw:
             for obj in output:
                 class_id = obj[1]
@@ -40,12 +41,12 @@ class ObjectDetector(BasicModel):
         """
         detection: [image_id, class_id, confidence, xmin, ymin, xmax, ymax, ]
         """
-        # for detection in detections:
+
         detection = detection[detection[:, 2] > self.args.conf]
-                    
+
         detection[:, 3] = (np.maximum(detection[:, 3], 0) * frame_shape[1]).astype(int)
         detection[:, 4] = (np.maximum(detection[:, 4], 0) * frame_shape[0]).astype(int)
         detection[:, 5] = (np.minimum(detection[:, 5], frame_shape[1]) * frame_shape[1]).astype(int)
         detection[:, 6] = (np.minimum(detection[:, 6], frame_shape[0]) * frame_shape[0]).astype(int)
-        
+
         return detection
